@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- OG Meta Tags for Social Media Queries --> 
+    <meta property="og:title" content="Minesweeper"/> 
+    <!-- Thumbnail here <meta property="og:image" content="https://raw.githubusercontent.com/1e9end/minesweeper"/> -->
+    <meta property="og:description" content="Online multiplayer Minesweeper battles!" /> 
+    <!-- Push and change to github url later -->
+    <meta property="og:url" content= "https://minesweeper.1egend.repl.co"/> 
+    <meta property="og:type" content="website"/>
+
+    <title>Minesweeper</title>
+
+    <!-- Google fonts, jQuery, Socket.io -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet"> 
+    <script 
+    src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src = "/socket.io/socket.io.js"></script>
+
+    <script src = "main.js" defer></script>
+    <style>
+        body{
+            //overflow: hidden;
+            font-family: calibri, 'Trebuchet MS', sans-serif;
+            margin: 0;
+        }
+        #header{
+            background: #2453FF;
+            padding: 15px;
+            height: 10vh;
+            color: white;
+        }
+        .v-center{
+            display: block;
+            position: relative; 
+            top: 50%; 
+            -ms-transform: translateY(-50%);
+            -webkit-transform: translateY(-50%);
+            transform: translateY(-50%);
+        }
+        #footer{
+            background-color: #CCCCCC;
+            position: fixed;
+            left: 0px;
+            bottom: 0px;
+            width: 100%;
+            padding: 5px;
+            text-align: center;
+        }
+
+        // Mobile CSS scaling
+        @media only screen and (max-height: 800px) and (max-width: 800px){
+            #footer {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id = "header">
+    </div>
+    <canvas id = "canvas"></canvas>
+    <div id = "footer">
+        Made with 💖 by <a href="https://1e9end.github.io/">1egend</a>
+    </div>
+</body>
+</html>
