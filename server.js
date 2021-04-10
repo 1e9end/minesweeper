@@ -7,7 +7,7 @@ const app = express();
 const server = http.Server(app);
 const io = socketIO(server);
 
-const port = 6969;
+const port = 7777;
 
 app.set('port', port);
 
