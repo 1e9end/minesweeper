@@ -58,3 +58,52 @@ setInterval(function() {
     io.sockets.emit('helloworld', 'Send this every second!');
   }, 1000);
 **/
+
+var boardHeight = 10
+var boardWidth = 10
+var numMines = 12
+var adjacent = [1,-1,boardWidth,-boardWidth,boardWidth+1,boardWidth-1,-boardWidth+1,-boardWidth-1]
+
+function revealTile(board,tile){
+  if (board[tile] < 9){ // checking if already revealed, and if it is a mine
+    board[tile] += 10; // we will use two digit numbers to symbolize revealed tiles
+    if (board[tile] == 10){ // is a blank square?
+      for (i in adjacent.slice(0,3)){
+        revealTile(board,tile + i) // repeat the process with adjacent squares, ik not the best approach, but it should work
+      }
+    }
+  }
+}
+
+function generateBoard(w,h,n){
+  var board = [];
+  for (i=0; i < h*w; i++){
+    board.push(0); // creating the elements of the array
+  }
+
+  for (i=0; i < n; i++){
+    board[Math.floor(Math.random() * h*w)] = 9; // 9 will represent a mine
+    for (x in adjacent){
+      if (board[x+i] != 9){
+        board[x+i] += 1; // add a 1 to adjacent tiles since there is another mine 
+      }
+    }
+  }
+
+  return board;
+}
+
+function tileClicked(board,tile){
+  if (board[tile] == 9){
+    // hit a mine
+  } else {
+    // just show the tile
+    revealTile(board,tile)
+  }
+}
+
+function tileFlagged(board,tile){
+  if (board[tile] == 9){
+    board[tile] = 19 // mine is flagged
+  }
+}
