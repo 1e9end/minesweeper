@@ -195,10 +195,16 @@ function click (id, i, z, w){
 
 // sockets
 io.on('connection', function(socket) {
-  socket.on('new player', function() {
-    games[socket.id] = generateGame(15, 40, socket.id);
+  socket.on('disconnect', function() {
+    delete games[socket.id];
   });
-  socket.on('mouseclicked', function(mouse) {
+  socket.on('new player', function(dimensions) {
+    // dimensions.w & dimensions.h 
+    // perhaps generate size and bomb # here
+    games[socket.id] = generateGame(15, 40, socket.id);
+    // console.log(games[socket.id]);
+  });
+  socket.on('mouse', function(mouse) {
     if (!mouse.clicked){return;}
     var game = games[socket.id];
     if (game.scene == 0){
