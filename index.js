@@ -7,7 +7,7 @@ const app = express();
 const server = http.Server(app);
 const io = socketIO(server);
 
-const port = 6666;
+const port = 3000;
 
 app.set('port', port);
 
@@ -231,12 +231,13 @@ function click (id, mouseY, mouseX, mouseB, real = true){
 io.on('connection', function(socket) {
   socket.on('disconnect', function() {
     delete games[socket.id];
+    io.sockets.emit('state', games);
   });
   socket.on('new player', function(dimensions) {
     // dimensions.w & dimensions.h 
     // perhaps generate size and bomb # here
-    delete games[socket.id];
     games[socket.id] = generateGame(15, 40, socket.id, dimensions.w, dimensions.h);
+    io.sockets.emit('state', games);
     //console.log(games[socket.id]);
   });
   socket.on('mouse', function(mouse) {
@@ -251,14 +252,14 @@ io.on('connection', function(socket) {
       click(id, Math.floor(mouse.y * game.boardSize / game.height), Math.floor(mouse.x * game.boardSize / game.width), mouse.button == 2 ? 0 : 1);  
     }
     checkWin(id);
+    io.sockets.emit('state', games);
   });
+
 });
 
-// Send player states back at 60fps
-setInterval(function() {
-  io.sockets.emit('state', games);
-}, 1000 / 60);
-
+/**
+ * 
+ */
 /**
 // Tile 
 var boardHeight = 10;
