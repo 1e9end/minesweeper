@@ -7,7 +7,7 @@ const app = express();
 const server = http.Server(app);
 const io = socketIO(server);
 
-const port = 3000;
+const port = 4000;
 
 app.set('port', port);
 
@@ -48,7 +48,7 @@ function check (i, z, m, s){
     return bmbn;
 }
 
-function generateGame(boardSize, b, id, w, h){
+function generateGame(boardSize, b){
   // you can never have too many bombs
   numMines = Math.min(b, Math.floor(boardSize * boardSize * 1/3)); 
   
@@ -125,9 +125,6 @@ function generateGame(boardSize, b, id, w, h){
 
   // return an object containing the info for this entire game
   return {
-    id: id,
-    width: w,
-    height: h,
     numMines: numMines, //b --> numMines
     boardSize: boardSize, //s --> boardSize
     bombMap: bombMap, //m --> bombMap
@@ -140,92 +137,148 @@ function generateGame(boardSize, b, id, w, h){
   };
 }
 
-function checkWin(id){
-  var game = games[id];
-    for (var i = 0; i < game.bombPos.length; ++i){
-        if (game.clientMap[game.bombPos[i][0]][game.bombPos[i][1]] !== -2){
+function Game(p1, p2, id){
+  // Create a game
+  var boardSize = 15;
+  var createdGame = generateGame(boardSize, 40);
+  this.roomInfo = {
+    id: id,
+    p1: p1,
+    p2: p2
+  };
+  // Info that is same for both players here
+  this.gameInfo = {
+    boardSize: boardSize,
+    numMines: createdGame.numMines,
+    bombMap: createdGame.bombMap,
+    bombPos: createdGame.bombPos,
+    bombn: createdGame.bombn
+  };
+  // Player specific client info here
+  this.players = {};
+  this.players[p1.id] = {
+    boardSize: boardSize,
+    width: p1.w,
+    height: p1.h,
+    clientMap: createdGame.clientMap,
+    flags: 0,
+    scene: 0,
+    lose: false
+  };
+  this.players[p2.id] = {
+    boardSize: boardSize,
+    width: p2.w,
+    height: p2.h,
+    clientMap: createdGame.clientMap,
+    flags: 0,
+    scene: 0,
+    lose: false
+  };
+}
+
+Game.prototype = {
+  click: function(id, mouseY, mouseX, mouseB, real = true){
+      // real is if the click function being called is actually from the click (true) vs a recursion reveal
+      let c = this.players[id];
+      // actual tile state
+      switch(this.gameInfo.bombMap[mouseY][mouseX]){
+          // safe tile
+          case 0:
+              // if left clicked
+              if (mouseB == 1){
+                if ((!real && c.clientMap[mouseY][mouseX] < 0) || (real && c.clientMap[mouseY][mouseX] == -1)){
+                  if (c.clientMap[mouseY][mouseX] == -2){
+                    -- c.flags;
+                  }
+                  c.clientMap[mouseY][mouseX] = c.bombn[mouseY][mouseX];
+                  if (c.bombn[mouseY][mouseX] === 0){
+                      for (var k = 0; k < cs.length; ++k){
+                          let coor = [cs[k][0] + mouseY, cs[k][1] + mouseX];
+                          if (coor[0] >= c.boardSize || coor[1] >= c.boardSize || coor[0] < 0 || coor[1] < 0){
+                            continue;
+                          }
+                          this.click(id, coor[0], coor[1], 1, false);
+                      }
+                  }
+                }
+              }
+              // right clicked
+              else if (c.flags < this.gameInfo.numMines){
+                  if (c.clientMap[mouseY][mouseX] == -1){
+                    // flag tile
+                    c.clientMap[mouseY][mouseX] = -2;
+                    ++ c.flags;
+                  }
+                  else if (c.clientMap[mouseY][mouseX] == -2){
+                    // unflag tile (unknown state)
+                    c.clientMap[mouseY][mouseX] = -1;
+                    -- c.flags;
+                  }
+              }
+          break;
+          // bomb tile
+          case 1:
+              // unknown
+              if (c.clientMap[mouseY][mouseX] === -1){
+                  // right clicked
+                  if (mouseB === 1){
+                      // loss here
+                      c.scene = 2;
+                      c.lose = true;
+                      c.clientMap[mouseY][mouseX] = -3;
+                  }
+                  // left clicked
+                  if (mouseB === 0 && c.flags < this.gameInfo.numMines){
+                      // flag tile
+                      c.clientMap[mouseY][mouseX] = -2;
+                      ++ c.flags;
+                  }
+              }
+              // flagged & left click -> unflag (unknown)
+              else if (mouseB === 0){
+                  c.clientMap[mouseY][mouseX] = -1;
+                  -- c.flags;
+              }
+      }
+  },
+  checkWin: function(id){
+    let b = this.gameInfo.bombPos;
+    let c = this.players[id].clientMap;
+
+    for (var i = 0; i < b.length; ++i){
+        if (c[b[i][0]][b[i][1]] !== -2){
             return false;
         }
     }
     
-    game.scene = 2;
+    this.players[id].scene = 2;
     return true;
-}
-
-function click (id, mouseY, mouseX, mouseB, real = true){
-    // real is if the click function being called is actually from the click (true) vs a recursion reveal
-    /**if (firstClick == true){
-      firstClick = false    // generating a new board on first click  
-      games[socket.id] = generateGame(15, 40, socket.id, dimensions.w, dimensions.h, z, i);
-    }**/
-    var game = games[id];
-
-    // m is the actual state of each tile, c is what the player will see
-    // m[][] 0 = safe, 1 = bomb
-    // c[][] -2 = flagged, -1 = unknown, other = bomb# 
-    // w = 1 left click, 0 right click 
-
-    // actual tile state
-    switch(game.bombMap[mouseY][mouseX]){
-        // safe tile
-        case 0:
-            // if left clicked
-            if (mouseB == 1){
-              if ((!real && game.clientMap[mouseY][mouseX] < 0) || (real && game.clientMap[mouseY][mouseX] == -1)){
-                if (game.clientMap[mouseY][mouseX] == -2){
-                  -- game.flags;
-                }
-                game.clientMap[mouseY][mouseX] = game.bombn[mouseY][mouseX];
-                if (game.bombn[mouseY][mouseX] === 0){
-                    for (var k = 0; k < cs.length; ++k){
-                        var coor = [cs[k][0] + mouseY, cs[k][1] + mouseX];
-                        if (coor[0] >= game.boardSize || coor[1] >= game.boardSize || coor[0] < 0 || coor[1] < 0){
-                          continue;
-                        }
-                        click(id, coor[0], coor[1], 1, false);
-                    }
-                }
-              }
-            }
-            // right clicked
-            else if (game.flags < game.numMines){
-                if (game.clientMap[mouseY][mouseX] == -1){
-                  // flag tile
-                  game.clientMap[mouseY][mouseX] = -2;
-                  ++ game.flags;
-                }
-                else if (game.clientMap[mouseY][mouseX] == -2){
-                  // unflag tile (unknown state)
-                  game.clientMap[mouseY][mouseX] = -1;
-                  -- game.flags;
-                }
-            }
-        break;
-        // bomb tile
-        case 1:
-            // unknown
-            if (game.clientMap[mouseY][mouseX] === -1){
-                // right clicked
-                if (mouseB === 1){
-                    // loss here
-                    game.scene = 2;
-                    game.lose = true;
-                    game.clientMap[mouseY][mouseX] = -3;
-                }
-                // left clicked
-                if (mouseB === 0 && game.flags < game.numMines){
-                    // flag tile
-                    game.clientMap[mouseY][mouseX] = -2;
-                    ++ game.flags;
-                }
-            }
-            // flagged & left click -> unflag (unknown)
-            else if (mouseB === 0){
-                game.clientMap[mouseY][mouseX] = -1;
-                -- game.flags;
-            }
+  },
+  update: function(id, mouse){
+    if (this.players[id].scene == 0){
+      this.players[id].scene = 1;
+      return;
     }
-}
+    if (this.players[id].scene == 1){
+      let s = this.gameInfo.boardSize;
+      let c = this.players[id];
+      this.click(id, Math.floor(mouse.y * s / c.height), Math.floor(mouse.x * s / c.width), mouse.button == 2 ? 0 : 1);  
+    }
+    this.checkWin(id);
+  },
+  emit: function(){
+    io.to(this.roomInfo.room).emit('state', this.players);
+  },
+  madeRoom: function(){
+    io.to(this.roomInfo.room).emit('madeRoom', this.roomInfo);
+  },
+  end: function(){
+
+  }
+};
+
+var matchQueue = [];
+var rooms = {};
 
 // sockets
 io.on('connection', function(socket) {
@@ -233,93 +286,35 @@ io.on('connection', function(socket) {
     delete games[socket.id];
     io.sockets.emit('state', games);
   });
-  socket.on('new player', function(dimensions) {
-    // dimensions.w & dimensions.h 
-    // perhaps generate size and bomb # here
-    games[socket.id] = generateGame(15, 40, socket.id, dimensions.w, dimensions.h);
-    io.sockets.emit('state', games);
-    //console.log(games[socket.id]);
+  socket.on('matchmake', function(dimensions) {
+    if (matchQueue.length > 0){
+      var roomId = matchQueue[0].room;
+      socket.join(roomId);
+      rooms[socket.id] = roomId;
+
+      // create game
+      games[roomId] = new Game(matchQueue[0], {id: socket.id, w: dimensions.w, h: dimensions.h}, roomId);
+
+      // remove waiting player from match queue
+      matchQueue.shift();
+      // tell the sockets that a room has been made and send room id
+      games[roomId].madeRoom();
+    }
+    else{
+      // generate unique room id
+      var roomId = 69;
+      socket.join(roomId);
+      rooms[socket.id] = roomId;
+
+      matchQueue.push({id: socket.id, w: dimensions.w, h: dimensions.h, room: roomId});
+    }
   });
-  socket.on('mouse', function(mouse) {
+  socket.on('clicked', function(mouse) {
     if (!mouse.clicked){return;}
-    var id = Object.keys(games)[Object.keys(games).length - 1];
-    // var id = socket.id;
-    var game = games[id];
-    if (game.scene == 0){
-      game.scene = 1;
-    }
-    if (game.scene == 1){
-      click(id, Math.floor(mouse.y * game.boardSize / game.height), Math.floor(mouse.x * game.boardSize / game.width), mouse.button == 2 ? 0 : 1);  
-    }
-    checkWin(id);
-    io.sockets.emit('state', games);
+    var room = rooms[socket.id];
+    // game = games[room]
+
+    games[room].update(socket.id, mouse);
+    games[room].emit();
   });
-
 });
-
-/**
- * 
- */
-/**
-// Tile 
-var boardHeight = 10;
-var boardWidth = 10;
-var numMines = 12;
-var adjacent = [1,-1,boardWidth,-boardWidth,boardWidth+1,boardWidth-1,-boardWidth+1,-boardWidth-1];
-var minePositions = [];
-
-function revealTile(board,tile){
-  if (board[tile] < 9){ // checking if already revealed, and if it is a mine
-    board[tile] += 10; // we will use two digit numbers to symbolize revealed tiles
-    if (board[tile] == 10){ // is a blank square?
-      for (i in adjacent.slice(0,3)){
-        revealTile(board,tile + i) // repeat the process with adjacent squares, ik not the best approach, but it should work
-        // I think it is the best approach tbh
-      }
-    }
-  }
-}
-
-function generateBoard(w,h,n){
-  var board = [];
-  for (i=0; i < h*w; i++){
-    board.push(0); // creating the elements of the array
-  }
-
-  for (i=0; i < n; i++){
-    var random = Math.floor(Math.random() * h*w);
-    board[random] = 9; // 9 will represent a mine
-    minePositions.push(random);
-    for (x in adjacent){
-      if (board[x+i] != 9){
-        board[x+i] += 1; // add a 1 to adjacent tiles since there is another mine 
-      }
-    }
-  }
-
-  return board;
-}
-
-function tileClicked(board,tile){
-  if (board[tile] == 9){
-    // hit a mine
-  } else {
-    // just show the tile
-    revealTile(board,tile)
-  }
-}
-
-function tileFlagged(board,tile){
-  if (board[tile] == 9){
-    board[tile] = 19; // mine is flagged
-
-    for (i in minePositions){
-      if (i == 9){
-        return
-      }
-    }
-
-    // mines have all been flagged
-  }
-}
-**/

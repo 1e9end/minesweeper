@@ -13,6 +13,9 @@ var mouse = {
 var w = 800, h = 800;
 var fps = 60;
 
+// Server info
+var room;
+var other;
 /** END OF GLOBALS */
 
 var canvas = document.getElementById('canvas');
@@ -87,71 +90,91 @@ function textSize(n){
 function text(t, x, y){
   ctx.fillText(t, x, y);
 }
+
+function translate(x, y){
+  ctx.translate(x, y);
+}
+
+function resetMatrix(){
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
 /** WRAPPER END */
 
-socket.on('state', function(games) {
-  // var map = games[socket.id];
-  // Not working cuz we need to create socket 'rooms' first in the current case there's an error the client recieves the state before their game gets generated on the server resulting in an undefined game when reading from the client
-  var map = games[Object.keys(games)[Object.keys(games).length - 1]];
+socket.on('madeRoom', function(roomInfo){
+  room = roomInfo.room;
+  other = (roomInfo.p1 == socket.id ? roomInfo.p2 : roomInfo.p1);
+});
+
+const sc = 2/15;
+
+function drawBoard(clientMap, ww, hh){
+  for (var y = 0; y < clientMap.length; ++y){
+    for (var x = 0; x < clientMap[y].length; ++x){
+      var cmv = clientMap[y][x];
+      fill(220);
+      stroke(222);
+      if (cmv >= 0 || cmv == -3){
+          fill(233);
+      }
+      rect(x * ww, y * hh, ww, hh);
+      if (cmv != -3 && cmv < 0){
+        fill(230);
+        quad(x * ww, y * hh, x * ww + ww * sc, y * hh + hh * sc, x * ww + ww * sc, y * hh + hh * (1 - sc), x * ww, y * hh + hh);
+        fill(240);
+        quad(x * ww, y * hh, x * ww + ww, y * hh, x * ww + ww * (1 - sc), y * hh + hh * sc, x * ww + ww * sc, y * hh + hh * sc);
+        fill(179);
+        quad(x * ww + ww, y * hh, x * ww + ww * (1 - sc), y * hh + hh * sc, x * ww + ww * (1 - sc), y * hh + hh * (1 - sc), x * ww + ww, y * hh + hh);
+        fill(171);
+        quad(x * ww, y * hh + hh, x * ww + ww * sc, y * hh + hh * (1 - sc), x * ww + ww * (1 - sc), y * hh + hh * (1 - sc), x * ww + ww, y * hh + hh);
+      }
+
+      if (cmv > 0){
+          switch(cmv){
+            case 1:
+              fill(0, 52, 222);
+            break;
+            case 2:
+              fill(42, 126, 40);
+            break;
+            default:
+              fill(135, 29, 33);
+          }
+          text(cmv, x * ww +  1/2 * ww, 1/2 * hh + y * hh); 
+      }
+      if (cmv == -2){
+          fill(0);
+          rect(x * ww + ww/5, y * hh + hh/5, ww /10, hh * 3/5);
+          fill(255, 0, 0);
+          triangle(x * ww + ww/5, y * hh + hh/5, x * ww + ww/5, y * hh + hh * 3/5, x * ww + ww * 4/5, y * hh + hh * 2/5);
+      }
+      if (cmv == -3){
+          fill(0);
+          circle(x * ww +  1/2 * hh, 1/2 * hh + y * hh, Math.min(ww, hh) * 1/5);
+      }
+    }
+  } 
+}
+
+socket.on('state', function(players) {
+  var p1 = players[socket.id];
+  var p2 = players[other];
+
   background(255);
   ctx.textBaseline = 'middle';
   ctx.textAlign = "center";
 
-  var bombMap = map.bombMap;
-  var clientMap = map.clientMap;
+  var ww = w/p1.boardSize;
+  var hh = h/p1.boardSize;
   
-  var ww = w/map.boardSize;
-  var hh = h/map.boardSize;
-
-  const sc = 2/15;
   ctx.font = `bold 20px sans-serif`;
-  for (var y = 0; y < bombMap.length; ++y){
-      for (var x = 0; x < bombMap[y].length; ++x){
-        var cmv = clientMap[y][x];
-        fill(220);
-        stroke(222);
-        if (cmv >= 0 || cmv == -3){
-            fill(233);
-        }
-        rect(x * ww, y * hh, ww, hh);
-        if (cmv != -3 && cmv < 0){
-          fill(230);
-          quad(x * ww, y * hh, x * ww + ww * sc, y * hh + hh * sc, x * ww + ww * sc, y * hh + hh * (1 - sc), x * ww, y * hh + hh);
-          fill(240);
-          quad(x * ww, y * hh, x * ww + ww, y * hh, x * ww + ww * (1 - sc), y * hh + hh * sc, x * ww + ww * sc, y * hh + hh * sc);
-          fill(179);
-          quad(x * ww + ww, y * hh, x * ww + ww * (1 - sc), y * hh + hh * sc, x * ww + ww * (1 - sc), y * hh + hh * (1 - sc), x * ww + ww, y * hh + hh);
-          fill(171);
-          quad(x * ww, y * hh + hh, x * ww + ww * sc, y * hh + hh * (1 - sc), x * ww + ww * (1 - sc), y * hh + hh * (1 - sc), x * ww + ww, y * hh + hh);
-        }
-
-        if (cmv > 0){
-            switch(cmv){
-              case 1:
-                fill(0, 52, 222);
-              break;
-              case 2:
-                fill(42, 126, 40);
-              break;
-              default:
-                fill(135, 29, 33);
-            }
-            text(cmv, x * ww +  1/2 * ww, 1/2 * hh + y * hh); 
-        }
-        if (cmv == -2){
-            fill(0);
-            rect(x * ww + ww/5, y * hh + hh/5, ww /10, hh * 3/5);
-            fill(255, 0, 0);
-            triangle(x * ww + ww/5, y * hh + hh/5, x * ww + ww/5, y * hh + hh * 3/5, x * ww + ww * 4/5, y * hh + hh * 2/5);
-        }
-        if (cmv == -3){
-            fill(0);
-            circle(x * ww +  1/2 * hh, 1/2 * hh + y * hh, Math.min(ww, hh) * 1/5);
-        }
-      }
-  }  
   
-  var scene = map.scene;
+  drawBoard(p1.clientMap, ww, hh);
+
+  translate(w + 100, 0);
+  drawBoard(p2.clientMap, ww, hh);
+  resetMatrix();
+
+  var scene = p1.scene;
   if (scene == 0){
       textSize(100);
       fill(0);
@@ -171,15 +194,14 @@ socket.on('state', function(games) {
           text("Victory!", w/2, h/3);
       }
   }
+
   canvas.onmouseup = function(e){
     mouse.clicked = true;
     mouse.button = e.button;
     mouse.x = e.offsetX;
     mouse.y = e.offsetY;
-    console.log('clicked');
   };
 });
-
 
 // Best browser performance requestAnimationFrame
 window.reqAnimationFrame = (function(callback){
@@ -190,21 +212,12 @@ window.reqAnimationFrame = (function(callback){
 })();
 
 function sendInfo(){
-    socket.emit('mouse', mouse);
+    socket.emit('clicked', mouse);
     if (mouse.clicked){
       mouse.clicked = false;
-      console.log('sent a clicked');
     }
     window.reqAnimationFrame(sendInfo, 1000/fps);
 }
 
-socket.emit('new player', {w: w, h: h});
+socket.emit('matchmake', {w: w, h: h});
 window.addEventListener("load", sendInfo, false);
-
-/**
-socket.emit('new player', {w: w, h: h});
-
-setInterval(function() {
-  socket.emit('mouse', mouse);
-}, 1000 / fps);
-**/

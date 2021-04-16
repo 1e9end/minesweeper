@@ -2,9 +2,9 @@
   "name": "minesweeper",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "test": "node server.js"
+    "test": "node index.js"
   },
   "repository": {
     "type": "git",
