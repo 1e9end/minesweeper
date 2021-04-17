@@ -20,10 +20,6 @@ server.listen(port, () => {
   console.log(`Server started at port: ${port}`);
 });
 
-// Stores games info
-var games = {};
-// var firstClick = true
-
 // Returns pseudorandom float in range [a, b)
 function random(a, b){
   return Math.random() * (b - a) + a;
@@ -142,9 +138,9 @@ function Game(p1, p2, id){
   var boardSize = 15;
   var createdGame = generateGame(boardSize, 40);
   this.roomInfo = {
-    id: id,
-    p1: p1,
-    p2: p2
+    room: id,
+    p1: p1.id,
+    p2: p2.id
   };
   // Info that is same for both players here
   this.gameInfo = {
@@ -160,7 +156,8 @@ function Game(p1, p2, id){
     boardSize: boardSize,
     width: p1.w,
     height: p1.h,
-    clientMap: createdGame.clientMap,
+    // JSON parse, stringify deep cloning works here since no undefined or functional properties
+    clientMap: JSON.parse(JSON.stringify(createdGame.clientMap)),
     flags: 0,
     scene: 0,
     lose: false
@@ -169,7 +166,7 @@ function Game(p1, p2, id){
     boardSize: boardSize,
     width: p2.w,
     height: p2.h,
-    clientMap: createdGame.clientMap,
+    clientMap: JSON.parse(JSON.stringify(createdGame.clientMap)),
     flags: 0,
     scene: 0,
     lose: false
@@ -190,8 +187,8 @@ Game.prototype = {
                   if (c.clientMap[mouseY][mouseX] == -2){
                     -- c.flags;
                   }
-                  c.clientMap[mouseY][mouseX] = c.bombn[mouseY][mouseX];
-                  if (c.bombn[mouseY][mouseX] === 0){
+                  c.clientMap[mouseY][mouseX] = this.gameInfo.bombn[mouseY][mouseX];
+                  if (this.gameInfo.bombn[mouseY][mouseX] === 0){
                       for (var k = 0; k < cs.length; ++k){
                           let coor = [cs[k][0] + mouseY, cs[k][1] + mouseX];
                           if (coor[0] >= c.boardSize || coor[1] >= c.boardSize || coor[0] < 0 || coor[1] < 0){
@@ -255,13 +252,15 @@ Game.prototype = {
     return true;
   },
   update: function(id, mouse){
-    if (this.players[id].scene == 0){
-      this.players[id].scene = 1;
+    let c = this.players[id];
+    if (mouse.x >= c.width || mouse.y >= c.height){
       return;
+    }
+    if (c.scene == 0){
+      c.scene = 1;
     }
     if (this.players[id].scene == 1){
       let s = this.gameInfo.boardSize;
-      let c = this.players[id];
       this.click(id, Math.floor(mouse.y * s / c.height), Math.floor(mouse.x * s / c.width), mouse.button == 2 ? 0 : 1);  
     }
     this.checkWin(id);
@@ -277,14 +276,16 @@ Game.prototype = {
   }
 };
 
+// Stores games info
+var games = {};
 var matchQueue = [];
 var rooms = {};
 
 // sockets
 io.on('connection', function(socket) {
   socket.on('disconnect', function() {
-    delete games[socket.id];
-    io.sockets.emit('state', games);
+    delete games[rooms[socket.id]];
+    delete rooms[socket.id];
   });
   socket.on('matchmake', function(dimensions) {
     if (matchQueue.length > 0){
@@ -295,18 +296,22 @@ io.on('connection', function(socket) {
       // create game
       games[roomId] = new Game(matchQueue[0], {id: socket.id, w: dimensions.w, h: dimensions.h}, roomId);
 
+      console.log(socket.id + " joined matchmaking from " + matchQueue[0].id);
       // remove waiting player from match queue
       matchQueue.shift();
       // tell the sockets that a room has been made and send room id
       games[roomId].madeRoom();
+      games[roomId].emit();
+      console.log(games[roomId]);
     }
     else{
       // generate unique room id
-      var roomId = 69;
+      var roomId = socket.id;
       socket.join(roomId);
       rooms[socket.id] = roomId;
 
       matchQueue.push({id: socket.id, w: dimensions.w, h: dimensions.h, room: roomId});
+      console.log(socket.id + " requested matchmaking...");
     }
   });
   socket.on('clicked', function(mouse) {

@@ -19,7 +19,7 @@ var other;
 /** END OF GLOBALS */
 
 var canvas = document.getElementById('canvas');
-canvas.width = w;
+canvas.width = 2 * w + 100;
 canvas.height = h;
 
 /** Custom written wrapper for CanvasRenderingContext2D **/ 
@@ -100,11 +100,6 @@ function resetMatrix(){
 }
 /** WRAPPER END */
 
-socket.on('madeRoom', function(roomInfo){
-  room = roomInfo.room;
-  other = (roomInfo.p1 == socket.id ? roomInfo.p2 : roomInfo.p1);
-});
-
 const sc = 2/15;
 
 function drawBoard(clientMap, ww, hh){
@@ -155,6 +150,12 @@ function drawBoard(clientMap, ww, hh){
   } 
 }
 
+socket.on('madeRoom', function(roomInfo){
+  room = roomInfo.room;
+  other = (roomInfo.p1 == socket.id ? roomInfo.p2 : roomInfo.p1);
+  console.log(socket.id + "successfully joined a game " + room + " with " + other);
+});
+
 socket.on('state', function(players) {
   var p1 = players[socket.id];
   var p2 = players[other];
@@ -185,7 +186,7 @@ socket.on('state', function(players) {
   if (scene == 2){
       textSize(100);
       fill(0);
-      if (map.lose){
+      if (p1.lose){
           text("Defeat...", w/2, h/3);
           textSize(40);
           text("Reload to try again", w/2, h * 2/3);
