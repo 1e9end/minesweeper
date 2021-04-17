@@ -9,18 +9,24 @@ var mouse = {
   button: false
 }
 
-// Canvas width and height
+// Board width and height
 var w = 800, h = 800;
+
+// Scale actual canvas width/height here to leave room for opponent board/ UI stats
+var windowWidth = 2 * w + 100, windowHeight = h + 100;
 var fps = 60;
 
 // Server info
 var room;
 var other;
+
+// 0 = no game, 1 = matchmaking, 2 = in game
+var state = 0;
 /** END OF GLOBALS */
 
 var canvas = document.getElementById('canvas');
-canvas.width = 2 * w + 100;
-canvas.height = h;
+canvas.width = windowWidth;
+canvas.height = windowHeight;
 
 /** Custom written wrapper for CanvasRenderingContext2D **/ 
 var ctx = canvas.getContext('2d');
@@ -43,9 +49,9 @@ function rect(x, y, w, h){
 }
 
 function background(r, g, b){
-  ctx.clearRect(0, 0, w, h);
+  ctx.clearRect(0, 0, windowWidth, windowHeight);
   fill(r, g, b);
-  rect(0, 0, w, h);
+  rect(0, 0, windowWidth, windowHeight);
 }
 
 function circle(x, y, r){
@@ -153,27 +159,35 @@ function drawBoard(clientMap, ww, hh){
 socket.on('madeRoom', function(roomInfo){
   room = roomInfo.room;
   other = (roomInfo.p1 == socket.id ? roomInfo.p2 : roomInfo.p1);
+  state = 2;
   console.log(socket.id + "successfully joined a game " + room + " with " + other);
 });
+
+socket.on('endGame', function(){
+  room = null;
+  other = null;
+  state = 0;
+});
+
+ctx.textBaseline = "middle";
+ctx.textAlign = "center";
 
 socket.on('state', function(players) {
   var p1 = players[socket.id];
   var p2 = players[other];
-
   background(255);
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = "center";
-
+  
   var ww = w/p1.boardSize;
   var hh = h/p1.boardSize;
   
   ctx.font = `bold 20px sans-serif`;
-  
-  drawBoard(p1.clientMap, ww, hh);
 
-  translate(w + 100, 0);
-  drawBoard(p2.clientMap, ww, hh);
-  resetMatrix();
+  fill(0);
+  text("Flags placed: " + p1.flags, w/2, (windowHeight - h)/2);
+  text("Room: " + room, windowWidth/2, (windowHeight - h)/2)
+  text("Opponent flags placed: " + p2.flags, windowWidth - w/2, (windowHeight - h)/2);
+  translate(0, 100);
+  drawBoard(p1.clientMap, ww, hh);
 
   var scene = p1.scene;
   if (scene == 0){
@@ -186,21 +200,25 @@ socket.on('state', function(players) {
   if (scene == 2){
       textSize(100);
       fill(0);
-      if (p1.lose){
+      if (p1.lose == 1){
           text("Defeat...", w/2, h/3);
-          textSize(40);
-          text("Reload to try again", w/2, h * 2/3);
       }
       else{
           text("Victory!", w/2, h/3);
       }
+      textSize(40);
+      text("Reload for new game", w/2, h * 2/3);
   }
+
+  translate(w + 100, 0);
+  drawBoard(p2.clientMap, ww, hh);
+  resetMatrix();
 
   canvas.onmouseup = function(e){
     mouse.clicked = true;
     mouse.button = e.button;
     mouse.x = e.offsetX;
-    mouse.y = e.offsetY;
+    mouse.y = e.offsetY + h - windowHeight;
   };
 });
 
@@ -212,13 +230,27 @@ window.reqAnimationFrame = (function(callback){
     };
 })();
 
-function sendInfo(){
-    socket.emit('clicked', mouse);
+function updateClient(){
+    switch(state){
+      case 1: 
+        background(255);
+        fill(0);
+        textSize(20);
+        text('Waiting for second player...', windowWidth/2, windowHeight/2);
+      break;
+      case 2:
+        socket.emit('clicked', mouse);
+    }
     if (mouse.clicked){
       mouse.clicked = false;
     }
-    window.reqAnimationFrame(sendInfo, 1000/fps);
+    window.reqAnimationFrame(updateClient, 1000/fps);
 }
 
-socket.emit('matchmake', {w: w, h: h});
-window.addEventListener("load", sendInfo, false);
+function matchMake(){
+  socket.emit('matchmake', {w: w, h: h});
+  state = 1;
+}
+
+matchMake();
+window.addEventListener("load", updateClient, false);

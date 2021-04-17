@@ -133,6 +133,11 @@ function generateGame(boardSize, b){
   };
 }
 
+// Stores games info
+var games = {};
+var matchQueue = [];
+var rooms = {};
+
 function Game(p1, p2, id){
   // Create a game
   var boardSize = 15;
@@ -160,7 +165,8 @@ function Game(p1, p2, id){
     clientMap: JSON.parse(JSON.stringify(createdGame.clientMap)),
     flags: 0,
     scene: 0,
-    lose: false
+    // 0 = still playing, 1 = lose, 2 = win
+    lose: 0
   };
   this.players[p2.id] = {
     boardSize: boardSize,
@@ -169,11 +175,15 @@ function Game(p1, p2, id){
     clientMap: JSON.parse(JSON.stringify(createdGame.clientMap)),
     flags: 0,
     scene: 0,
-    lose: false
+    lose: 0
   };
 }
 
 Game.prototype = {
+  // return the other id
+  other: function(id){
+    return id == this.roomInfo.p1 ? this.roomInfo.p2 : this.roomInfo.p1;
+  },
   click: function(id, mouseY, mouseX, mouseB, real = true){
       // real is if the click function being called is actually from the click (true) vs a recursion reveal
       let c = this.players[id];
@@ -221,7 +231,10 @@ Game.prototype = {
                   if (mouseB === 1){
                       // loss here
                       c.scene = 2;
-                      c.lose = true;
+                      c.lose = 1;
+                      // other player wins
+                      this.players[this.other(id)].scene = 2;
+                      this.players[this.other(id)].lose = 2;
                       c.clientMap[mouseY][mouseX] = -3;
                   }
                   // left clicked
@@ -248,7 +261,10 @@ Game.prototype = {
         }
     }
     
+    this.players[id].lose = 2;
     this.players[id].scene = 2;
+    this.players[this.other(id)].lose = 1;
+    this.players[this.other(id)].scene = 2;
     return true;
   },
   update: function(id, mouse){
@@ -259,11 +275,17 @@ Game.prototype = {
     if (c.scene == 0){
       c.scene = 1;
     }
-    if (this.players[id].scene == 1){
+    if (c.scene == 1){
       let s = this.gameInfo.boardSize;
       this.click(id, Math.floor(mouse.y * s / c.height), Math.floor(mouse.x * s / c.width), mouse.button == 2 ? 0 : 1);  
+      this.checkWin(id);
     }
-    this.checkWin(id);
+
+    this.emit();
+    // lost or won (game over)
+    if (this.players[id].lose !=  0){
+      this.end();
+    }
   },
   emit: function(){
     io.to(this.roomInfo.room).emit('state', this.players);
@@ -271,21 +293,44 @@ Game.prototype = {
   madeRoom: function(){
     io.to(this.roomInfo.room).emit('madeRoom', this.roomInfo);
   },
-  end: function(){
+  end: function(id = false){
+    // If someone disconnects, other player wins
+    if (id){
+      this.players[id].lose = 1;
+      this.players[id].scene = 2;
+      this.players[this.other(id)].lose = 2;
+      this.players[this.other(id)].scene = 2;
+      this.emit();
+    }
+    // Emit endgame to all the clients
+    io.to(this.roomInfo.room).emit('endGame');
 
+    // Remove all members of the room from the room (flexible for potential future 3+ player support)
+    var clients = io.sockets.adapter.rooms.get(this.roomInfo.room);
+    for (var socketId of clients) {
+      var clientSocket = io.sockets.sockets.get(socketId);
+      clientSocket.leave(this.roomInfo.room);
+    }
+
+    // Delete key/value pairs from rooms{} and games{}
+    delete rooms[this.roomInfo.p1];
+    delete rooms[this.roomInfo.p2];
+    delete games[this.roomInfo.room];
   }
 };
-
-// Stores games info
-var games = {};
-var matchQueue = [];
-var rooms = {};
 
 // sockets
 io.on('connection', function(socket) {
   socket.on('disconnect', function() {
-    delete games[rooms[socket.id]];
-    delete rooms[socket.id];
+    if (socket.id in rooms){
+      console.log(socket.id + " disconnected from room: " + rooms[socket.id]);
+      if (rooms[socket.id] in games){
+        games[rooms[socket.id]].end(socket.id);
+      }
+      else{
+        delete rooms[socket.id];
+      }
+    }
   });
   socket.on('matchmake', function(dimensions) {
     if (matchQueue.length > 0){
@@ -315,11 +360,10 @@ io.on('connection', function(socket) {
     }
   });
   socket.on('clicked', function(mouse) {
-    if (!mouse.clicked){return;}
+    if (!mouse.clicked || !(socket.id in rooms)){return;}
     var room = rooms[socket.id];
     // game = games[room]
 
     games[room].update(socket.id, mouse);
-    games[room].emit();
   });
 });
