@@ -48,18 +48,41 @@
             text-align: center;
         }
 
+        canvas{
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+        }
+
+        #menu {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          text-align: center;
+          font-size: 2em;
+        }
+
+        #roomInput {
+          width: 100%;
+          padding: 10px;
+        }
         // Mobile CSS scaling
         @media only screen and (max-height: 800px) and (max-width: 800px){
-            #footer {
-                display: none;
-            }
         }
     </style>
 </head>
 <body oncontextmenu="return false;">
     <canvas id = "canvas"></canvas>
-    <div id = "footer">
-        <!-- Made with 💖 by <a href="https://1e9end.github.io/">1egend</a> and TheCelestialCube -->
+    <div id = "menu">
+      Minesweeper <br><br>
+      <input type="text" id="roomInput" name="roomInput" placeholder="Enter room code (Leave blank for random matchmaking)">
+      <button onclick="matchMake()">Join!</button>
+      <button onclick="makeRoom()">Create a room!</button>
     </div>
+    <!-- <div id = "footer">
+        Made with 💖 by <a href="https://1e9end.github.io/">1egend</a> and TheCelestialCube 
+    </div>-->
 </body>
 </html>

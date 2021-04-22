@@ -9,14 +9,20 @@ var mouse = {
   button: false
 }
 
+// Dimensions of the window
+var tabWidth = window.innerWidth;
+var tabHeight = window.innerHeight;
+
 // Board width and height
-var w = 800, h = 800;
+var dim = Math.min((tabWidth - 100)/2 - 50, tabHeight - 150);
+var w = dim, h = dim;
 
 // Scale actual canvas width/height here to leave room for opponent board/ UI stats
 var windowWidth = 2 * w + 100, windowHeight = h + 100;
 var fps = 60;
 
 // Server info
+var createdRoom = false;
 var room;
 var other;
 
@@ -51,6 +57,7 @@ function rect(x, y, w, h){
 function background(r, g, b){
   ctx.clearRect(0, 0, windowWidth, windowHeight);
   fill(r, g, b);
+  stroke(255);
   rect(0, 0, windowWidth, windowHeight);
 }
 
@@ -139,7 +146,7 @@ function drawBoard(clientMap, ww, hh){
             break;
             default:
               fill(135, 29, 33);
-          }
+          } 
           text(cmv, x * ww +  1/2 * ww, 1/2 * hh + y * hh); 
       }
       if (cmv == -2){
@@ -163,10 +170,16 @@ socket.on('madeRoom', function(roomInfo){
   console.log(socket.id + "successfully joined a game " + room + " with " + other);
 });
 
+socket.on('noRoom', function(){
+
+});
+
 socket.on('endGame', function(){
   room = null;
   other = null;
+  createdRoom = false;
   state = 0;
+  document.getElementById("menu").style.display = "block";
 });
 
 ctx.textBaseline = "middle";
@@ -180,7 +193,7 @@ socket.on('state', function(players) {
   var ww = w/p1.boardSize;
   var hh = h/p1.boardSize;
   
-  ctx.font = `bold 20px sans-serif`;
+  ctx.font = `bold ${tabWidth/80}px sans-serif`;
 
   fill(0);
   text("Flags placed: " + p1.flags, w/2, (windowHeight - h)/2);
@@ -188,30 +201,67 @@ socket.on('state', function(players) {
   text("Opponent flags placed: " + p2.flags, windowWidth - w/2, (windowHeight - h)/2);
   translate(0, 100);
   drawBoard(p1.clientMap, ww, hh);
+  if (p1.freeze){
+    ctx.globalAlpha = 0.2;
+    fill(0, 0, 255, 100);
+    rect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+    fill(255);
+    textSize(dim/10);
+    text("Frozen", w/2, h/2);
+  }
 
   var scene = p1.scene;
   if (scene == 0){
-      textSize(100);
+      textSize(dim/10);
       fill(0);
       text("Minesweeper", w/2, h/3);
-      textSize(40);
+      textSize(dim/20);
       text("Click to start", w/2, h * 2/3);
   }
   if (scene == 2){
-      textSize(100);
+      textSize(dim/10);
       fill(0);
       if (p1.lose == 1){
-          text("Defeat...", w/2, h/3);
+          text("Defeat...", w/2, h/2);
       }
       else{
-          text("Victory!", w/2, h/3);
+          text("Victory!", w/2, h/2);
       }
-      textSize(40);
-      text("Reload for new game", w/2, h * 2/3);
   }
 
   translate(w + 100, 0);
-  drawBoard(p2.clientMap, ww, hh);
+  for (var y = 0; y < p2.greenMap.length; ++y){
+    for (var x = 0; x < p2.greenMap[y].length; ++x){
+      var cmv = p2.greenMap[y][x];
+      if (cmv){
+        fill(0, 255, 0);
+        rect(x * ww, y * hh, ww, hh);
+        continue;
+      }
+
+      fill(220);
+      stroke(222);
+      rect(x * ww, y * hh, ww, hh);
+      fill(230);
+      quad(x * ww, y * hh, x * ww + ww * sc, y * hh + hh * sc, x * ww + ww * sc, y * hh + hh * (1 - sc), x * ww, y * hh + hh);
+      fill(240);
+      quad(x * ww, y * hh, x * ww + ww, y * hh, x * ww + ww * (1 - sc), y * hh + hh * sc, x * ww + ww * sc, y * hh + hh * sc);
+      fill(179);
+      quad(x * ww + ww, y * hh, x * ww + ww * (1 - sc), y * hh + hh * sc, x * ww + ww * (1 - sc), y * hh + hh * (1 - sc), x * ww + ww, y * hh + hh);
+      fill(171);
+      quad(x * ww, y * hh + hh, x * ww + ww * sc, y * hh + hh * (1 - sc), x * ww + ww * (1 - sc), y * hh + hh * (1 - sc), x * ww + ww, y * hh + hh);
+    }
+  } 
+  if (p2.freeze){
+    ctx.globalAlpha = 0.2;
+    fill(0, 0, 255, 100);
+    rect(0, 0, w, h);
+    ctx.globalAlpha = 1;
+    fill(255);
+    textSize(dim/10);
+    text("Frozen", w/2, h/2);
+  }
   resetMatrix();
 
   canvas.onmouseup = function(e){
@@ -236,7 +286,13 @@ function updateClient(){
         background(255);
         fill(0);
         textSize(20);
-        text('Waiting for second player...', windowWidth/2, windowHeight/2);
+        if (createdRoom !== false){
+          text('Created a room!', windowWidth/2, windowHeight/2);
+          text('Room code to join: ' + createdRoom, windowWidth/2, windowHeight * 2/3);
+        }
+        else{
+          text('Waiting for second player...', windowWidth/2, windowHeight/2);
+        }
       break;
       case 2:
         socket.emit('clicked', mouse);
@@ -248,9 +304,25 @@ function updateClient(){
 }
 
 function matchMake(){
-  socket.emit('matchmake', {w: w, h: h});
+  if (state != 0){
+    return;
+  }
+  var roomCode = document.getElementById("roomInput").value;
+  socket.emit('matchmake', {room: roomCode, w: w, h: h});
+  document.getElementById("menu").style.display = "none";
   state = 1;
 }
 
-matchMake();
+function makeRoom(){
+  if (state != 0){
+    return;
+  }
+  socket.emit('makeRoom', {w: w, h: h});
+  createdRoom = socket.id;
+  console.log(createdRoom);
+  document.getElementById("menu").style.display = "none";
+  state = 1;
+}
+
+//matchMake();
 window.addEventListener("load", updateClient, false);

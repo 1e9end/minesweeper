@@ -51,6 +51,7 @@ function generateGame(boardSize, b){
   // m is the actual state of each tile, c is what the player will see
   // m[][] 0 = safe, 1 = bomb
   // c[][] -2 = flagged, -1 = unknown, other = bomb# 
+  // g[][] 0 = grey, 1 = green
   var bombMap = [];
   var clientMap = [];
   var bombn = [];
@@ -136,6 +137,7 @@ function generateGame(boardSize, b){
 // Stores games info
 var games = {};
 var matchQueue = [];
+var roomQueue = {};
 var rooms = {};
 
 function Game(p1, p2, id){
@@ -163,8 +165,10 @@ function Game(p1, p2, id){
     height: p1.h,
     // JSON parse, stringify deep cloning works here since no undefined or functional properties
     clientMap: JSON.parse(JSON.stringify(createdGame.clientMap)),
+    greenMap: Array(boardSize).fill().map(() => Array(boardSize)),
     flags: 0,
     scene: 0,
+    freeze: false,
     // 0 = still playing, 1 = lose, 2 = win
     lose: 0
   };
@@ -173,8 +177,10 @@ function Game(p1, p2, id){
     width: p2.w,
     height: p2.h,
     clientMap: JSON.parse(JSON.stringify(createdGame.clientMap)),
+    greenMap: Array(boardSize).fill().map(() => Array(boardSize)),
     flags: 0,
     scene: 0,
+    freeze: false,
     lose: 0
   };
 }
@@ -197,6 +203,7 @@ Game.prototype = {
                   if (c.clientMap[mouseY][mouseX] == -2){
                     -- c.flags;
                   }
+                  c.greenMap[mouseY][mouseX] = true;
                   c.clientMap[mouseY][mouseX] = this.gameInfo.bombn[mouseY][mouseX];
                   if (this.gameInfo.bombn[mouseY][mouseX] === 0){
                       for (var k = 0; k < cs.length; ++k){
@@ -226,26 +233,36 @@ Game.prototype = {
           // bomb tile
           case 1:
               // unknown
-              if (c.clientMap[mouseY][mouseX] === -1){
+              if (c.clientMap[mouseY][mouseX] == -1){
                   // right clicked
-                  if (mouseB === 1){
+                  if (mouseB == 1){
                       // loss here
-                      c.scene = 2;
-                      c.lose = 1;
-                      // other player wins
-                      this.players[this.other(id)].scene = 2;
-                      this.players[this.other(id)].lose = 2;
+                      c.freeze = true;
+                      setTimeout(function(t, id){
+                        t.players[id].freeze = false;
+                        t.emit();
+                      }, 15000, this, id);
                       c.clientMap[mouseY][mouseX] = -3;
                   }
                   // left clicked
-                  if (mouseB === 0 && c.flags < this.gameInfo.numMines){
+                  if (mouseB == 0 && c.flags < this.gameInfo.numMines){
                       // flag tile
+                      c.greenMap[mouseY][mouseX] = true;
                       c.clientMap[mouseY][mouseX] = -2;
                       ++ c.flags;
                   }
               }
+              // uncovered bomb
+              else if (c.clientMap[mouseY][mouseX] == -3){
+                if(c.flags < this.gameInfo.numMines && mouseB == 0){
+                    c.greenMap[mouseY][mouseX] = true;
+                    c.clientMap[mouseY][mouseX] = -2;
+                    ++ c.flags;
+                }
+              }
               // flagged & left click -> unflag (unknown)
-              else if (mouseB === 0){
+              else if (mouseB == 0){
+                  c.greenMap[mouseY][mouseX] = false;
                   c.clientMap[mouseY][mouseX] = -1;
                   -- c.flags;
               }
@@ -269,7 +286,7 @@ Game.prototype = {
   },
   update: function(id, mouse){
     let c = this.players[id];
-    if (mouse.x >= c.width || mouse.y >= c.height){
+    if (mouse.x >= c.width || mouse.x < 0 || mouse.y >= c.height || mouse.y < 0 || c.freeze){
       return;
     }
     if (c.scene == 0){
@@ -328,18 +345,45 @@ io.on('connection', function(socket) {
         games[rooms[socket.id]].end(socket.id);
       }
       else{
+        if (matchQueue[0] == socket.id){
+          matchQueue.shift();
+        }
+        if (socket.id in roomQueue){
+          delete roomQueue[socket.id];
+        }
         delete rooms[socket.id];
       }
     }
   });
-  socket.on('matchmake', function(dimensions) {
+  socket.on('matchmake', function(info) {
+    if (info.room != ''){
+      if (info.room in roomQueue){
+        socket.join(info.room);
+        rooms[socket.id] = info.room;
+
+        // create game
+        games[info.room] = new Game(roomQueue[info.room], {id: socket.id, w: info.w, h: info.h}, info.room);
+
+        console.log(socket.id + " joined created room: " + info.room);
+        // remove room queue
+       delete roomQueue[info.room];
+        // tell the sockets that a room has been made and send room id
+        games[info.room].madeRoom();
+        games[info.room].emit();
+      }
+      else{
+        socket.emit('noRoom');
+      }
+      return;
+    }
+
     if (matchQueue.length > 0){
       var roomId = matchQueue[0].room;
       socket.join(roomId);
       rooms[socket.id] = roomId;
 
       // create game
-      games[roomId] = new Game(matchQueue[0], {id: socket.id, w: dimensions.w, h: dimensions.h}, roomId);
+      games[roomId] = new Game(matchQueue[0], {id: socket.id, w: info.w, h: info.h}, roomId);
 
       console.log(socket.id + " joined matchmaking from " + matchQueue[0].id);
       // remove waiting player from match queue
@@ -347,7 +391,6 @@ io.on('connection', function(socket) {
       // tell the sockets that a room has been made and send room id
       games[roomId].madeRoom();
       games[roomId].emit();
-      console.log(games[roomId]);
     }
     else{
       // generate unique room id
@@ -355,9 +398,18 @@ io.on('connection', function(socket) {
       socket.join(roomId);
       rooms[socket.id] = roomId;
 
-      matchQueue.push({id: socket.id, w: dimensions.w, h: dimensions.h, room: roomId});
+      matchQueue.push({id: socket.id, w: info.w, h: info.h, room: roomId});
       console.log(socket.id + " requested matchmaking...");
     }
+  });
+  socket.on('makeRoom', function(info){
+    // generate unique room id
+      var roomId = socket.id;
+      socket.join(roomId);
+      rooms[socket.id] = roomId;
+
+      roomQueue[roomId] = {id: socket.id, w: info.w, h: info.h, room: roomId};
+      console.log(socket.id + " made a room: " + roomId);;
   });
   socket.on('clicked', function(mouse) {
     if (!mouse.clicked || !(socket.id in rooms)){return;}
