@@ -9,12 +9,8 @@ var mouse = {
   button: false
 }
 
-// Dimensions of the window
-var tabWidth = window.innerWidth;
-var tabHeight = window.innerHeight;
-
 // Board width and height
-var dim = Math.min((tabWidth - 100)/2 - 50, tabHeight - 150);
+var dim = Math.min((window.innerWidth - 100)/2 - 50, window.innerHeight - 150);
 var w = dim, h = dim;
 
 // Scale actual canvas width/height here to leave room for opponent board/ UI stats
@@ -30,9 +26,23 @@ var other;
 var state = 0;
 /** END OF GLOBALS */
 
+/**
 var canvas = document.getElementById('canvas');
 canvas.width = windowWidth;
 canvas.height = windowHeight;
+**/
+
+function setHiPPICanvas(w, h) {
+    let ratio = window.devicePixelRatio;
+    let cv = document.getElementById("canvas");
+    cv.width = w * ratio;
+    cv.height = h * ratio;
+    cv.style.width = w + "px";
+    cv.style.height = h + "px";
+    cv.getContext("2d").scale(ratio, ratio);
+}
+
+setHiPPICanvas(windowWidth, windowHeight);
 
 /** Custom written wrapper for CanvasRenderingContext2D **/ 
 var ctx = canvas.getContext('2d');
@@ -193,7 +203,7 @@ socket.on('state', function(players) {
   var ww = w/p1.boardSize;
   var hh = h/p1.boardSize;
   
-  ctx.font = `bold ${tabWidth/80}px sans-serif`;
+  ctx.font = `bold ${window.innerWidth/80}px sans-serif`;
 
   fill(0);
   text("Flags placed: " + p1.flags, w/2, (windowHeight - h)/2);
