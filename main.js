@@ -208,7 +208,9 @@ socket.on('state', function(players) {
     ctx.globalAlpha = 1;
     fill(255);
     textSize(dim/10);
-    text("Frozen", w/2, h/2);
+    text("Frozen", w/2, h/3);
+    textSize(dim/20);
+    text(Math.ceil((15000 - p1.freezeTimer)/1000) + " seconds remaining", w/2, h * 2/3);
   }
 
   var scene = p1.scene;
@@ -253,24 +255,68 @@ socket.on('state', function(players) {
       quad(x * ww, y * hh + hh, x * ww + ww * sc, y * hh + hh * (1 - sc), x * ww + ww * (1 - sc), y * hh + hh * (1 - sc), x * ww + ww, y * hh + hh);
     }
   } 
-  if (p2.freeze){
+  if (p2.freeze){ 
     ctx.globalAlpha = 0.2;
     fill(0, 0, 255, 100);
     rect(0, 0, w, h);
     ctx.globalAlpha = 1;
     fill(255);
     textSize(dim/10);
-    text("Frozen", w/2, h/2);
+    text("Frozen", w/2, h/3);
+    textSize(dim/20);
+    text(Math.ceil((15000 - p2.freezeTimer)/1000) + " seconds remaining", w/2, h * 2/3);
   }
   resetMatrix();
-
-  canvas.onmouseup = function(e){
-    mouse.clicked = true;
-    mouse.button = e.button;
-    mouse.x = e.offsetX;
-    mouse.y = e.offsetY + h - windowHeight;
-  };
 });
+
+canvas.onmouseup = function(e){
+  mouse.clicked = true;
+  mouse.button = e.button;
+  mouse.x = e.offsetX;
+  mouse.y = e.offsetY + h - windowHeight;
+};
+
+function fallbackCopyTextToClipboard(text) {
+  var textArea = document.createElement("textarea");
+  textArea.value = text;
+  
+  // Avoid scrolling to bottom
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.position = "fixed";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    var successful = document.execCommand('copy');
+    var msg = successful ? 'successful' : 'unsuccessful';
+    console.log('Fallback: Copying text command was ' + msg);
+  } catch (err) {
+    console.error('Fallback: Oops, unable to copy', err);
+  }
+
+  document.body.removeChild(textArea);
+}
+
+function copyTextToClipboard(text) {
+  if (!navigator.clipboard) {
+    fallbackCopyTextToClipboard(text);
+    return;
+  }
+  navigator.clipboard.writeText(text).then(function() {
+    console.log('Async: Copying to clipboard was successful!');
+  }, function(err) {
+    console.error('Async: Could not copy text: ', err);
+  });
+}
+
+canvas.onclick = function(){
+  if (state == 1 && createdRoom){
+    copyTextToClipboard(createdRoom);
+  }
+};
 
 // Best browser performance requestAnimationFrame
 window.reqAnimationFrame = (function(callback){
@@ -286,9 +332,9 @@ function updateClient(){
         background(255);
         fill(0);
         textSize(20);
-        if (createdRoom !== false){
+        if (createdRoom){
           text('Created a room!', windowWidth/2, windowHeight/2);
-          text('Room code to join: ' + createdRoom, windowWidth/2, windowHeight * 2/3);
+          text('Room code to join (click to copy): ' + createdRoom, windowWidth/2, windowHeight * 2/3);
         }
         else{
           text('Waiting for second player...', windowWidth/2, windowHeight/2);

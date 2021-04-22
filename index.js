@@ -168,6 +168,7 @@ function Game(p1, p2, id){
     greenMap: Array(boardSize).fill().map(() => Array(boardSize)),
     flags: 0,
     scene: 0,
+    freezeTimer: 0,
     freeze: false,
     // 0 = still playing, 1 = lose, 2 = win
     lose: 0
@@ -180,6 +181,7 @@ function Game(p1, p2, id){
     greenMap: Array(boardSize).fill().map(() => Array(boardSize)),
     flags: 0,
     scene: 0,
+    freezeTimer: 0,
     freeze: false,
     lose: 0
   };
@@ -238,10 +240,18 @@ Game.prototype = {
                   if (mouseB == 1){
                       // loss here
                       c.freeze = true;
-                      setTimeout(function(t, id){
+                      let freezeTime = new Date();
+                      let freezeUpdater = setInterval(function(t, id, start) {
+                          t.players[id].freezeTimer = new Date() - start;
+                          t.emit();
+                      }, 1000, this, id, freezeTime);
+                      setTimeout(function(t, id, y, x){
+                        clearInterval(freezeUpdater);
                         t.players[id].freeze = false;
+                        t.players[id].clientMap[y][x] = -1;
                         t.emit();
-                      }, 15000, this, id);
+                      }, 15000, this, id, mouseY, mouseX);
+                      
                       c.clientMap[mouseY][mouseX] = -3;
                   }
                   // left clicked
