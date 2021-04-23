@@ -9,12 +9,15 @@ var mouse = {
   button: false
 }
 
+var windowWidth = window.innerWidth;
+var windowHeight = window.innerHeight;
+
 // Board width and height
-var dim = Math.min((window.innerWidth - 100)/2 - 50, window.innerHeight - 150);
+var dim = Math.min((windowWidth - 100)/2 - 50, windowHeight - 150);
 var w = dim, h = dim;
 
 // Scale actual canvas width/height here to leave room for opponent board/ UI stats
-var windowWidth = 2 * w + 100, windowHeight = h + 100;
+var canvasWidth = 2 * w + 100, canvasHeight = h + 100;
 var fps = 60;
 
 // Server info
@@ -28,8 +31,8 @@ var state = 0;
 
 /**
 var canvas = document.getElementById('canvas');
-canvas.width = windowWidth;
-canvas.height = windowHeight;
+canvas.width = canvasWidth;
+canvas.height = canvasHeight;
 **/
 
 function setHiPPICanvas(w, h) {
@@ -42,7 +45,7 @@ function setHiPPICanvas(w, h) {
     cv.getContext("2d").scale(ratio, ratio);
 }
 
-setHiPPICanvas(windowWidth, windowHeight);
+setHiPPICanvas(canvasWidth, canvasHeight);
 
 /** Custom written wrapper for CanvasRenderingContext2D **/ 
 var ctx = canvas.getContext('2d');
@@ -65,10 +68,10 @@ function rect(x, y, w, h){
 }
 
 function background(r, g, b){
-  ctx.clearRect(0, 0, windowWidth, windowHeight);
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
   fill(r, g, b);
   stroke(255);
-  rect(0, 0, windowWidth, windowHeight);
+  rect(0, 0, canvasWidth, canvasHeight);
 }
 
 function circle(x, y, r){
@@ -123,6 +126,56 @@ function resetMatrix(){
 }
 /** WRAPPER END */
 
+function runSnackbar(msg) {
+  var x = document.getElementById("snackbar");
+  x.classList.remove("show");
+  void x.offsetWidth;
+  x.textContent = msg;
+  x.className = "show";
+  var z = setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+  var n = z - 1;
+  while (n--) {
+      window.clearTimeout(n);
+  }
+} 
+
+function toggleMenu(on = true){
+  if (on){
+    document.getElementById("menu").style.display = "block";
+    document.getElementById("description").style.display = "block";
+  }
+  else {
+    document.getElementById("menu").style.display = "none";
+    document.getElementById("description").style.display = "none";
+  }
+}
+
+socket.on('madeRoom', function(roomInfo){
+  room = roomInfo.room;
+  other = (roomInfo.p1 == socket.id ? roomInfo.p2 : roomInfo.p1);
+  state = 2;
+  console.log(socket.id + "successfully joined a game " + room + " with " + other);
+  runSnackbar("Entered match");
+});
+
+socket.on('noRoom', function(){
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+  state = 0;
+  toggleMenu(true);
+  runSnackbar("Room does not exist");
+});
+
+socket.on('endGame', function(){
+  room = null;
+  other = null;
+  createdRoom = false;
+  state = 0;
+  toggleMenu(true);
+});
+
+ctx.textBaseline = "middle";
+ctx.textAlign = "center";
+
 const sc = 2/15;
 
 function drawBoard(clientMap, ww, hh){
@@ -173,27 +226,8 @@ function drawBoard(clientMap, ww, hh){
   } 
 }
 
-socket.on('madeRoom', function(roomInfo){
-  room = roomInfo.room;
-  other = (roomInfo.p1 == socket.id ? roomInfo.p2 : roomInfo.p1);
-  state = 2;
-  console.log(socket.id + "successfully joined a game " + room + " with " + other);
-});
-
-socket.on('noRoom', function(){
-
-});
-
-socket.on('endGame', function(){
-  room = null;
-  other = null;
-  createdRoom = false;
-  state = 0;
-  document.getElementById("menu").style.display = "block";
-});
-
-ctx.textBaseline = "middle";
-ctx.textAlign = "center";
+var frozenImg = new Image(w, h);
+frozenImg.src = "./assets/frozen.png";
 
 socket.on('state', function(players) {
   var p1 = players[socket.id];
@@ -203,20 +237,19 @@ socket.on('state', function(players) {
   var ww = w/p1.boardSize;
   var hh = h/p1.boardSize;
   
-  ctx.font = `bold ${window.innerWidth/80}px sans-serif`;
+  ctx.font = `bold ${windowWidth/80}px sans-serif`;
 
   fill(0);
-  text("Flags placed: " + p1.flags, w/2, (windowHeight - h)/2);
-  text("Room: " + room, windowWidth/2, (windowHeight - h)/2)
-  text("Opponent flags placed: " + p2.flags, windowWidth - w/2, (windowHeight - h)/2);
+  text("Flags placed: " + p1.flags + "/40", w/2, (canvasHeight - h)/2);
+  text("Room: " + room, canvasWidth/2, (canvasHeight - h)/2)
+  text("Opponent flags placed: " + p2.flags + "/40", canvasWidth - w/2, (canvasHeight - h)/2);
   translate(0, 100);
   drawBoard(p1.clientMap, ww, hh);
   if (p1.freeze){
-    ctx.globalAlpha = 0.2;
-    fill(0, 0, 255, 100);
-    rect(0, 0, w, h);
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(frozenImg, 0, 0, w, h);
     ctx.globalAlpha = 1;
-    fill(255);
+    fill(145, 215, 215);
     textSize(dim/10);
     text("Frozen", w/2, h/3);
     textSize(dim/20);
@@ -243,6 +276,7 @@ socket.on('state', function(players) {
   }
 
   translate(w + 100, 0);
+  ctx.font = `bold ${windowWidth/80}px sans-serif`;
   for (var y = 0; y < p2.greenMap.length; ++y){
     for (var x = 0; x < p2.greenMap[y].length; ++x){
       var cmv = p2.greenMap[y][x];
@@ -266,11 +300,10 @@ socket.on('state', function(players) {
     }
   } 
   if (p2.freeze){ 
-    ctx.globalAlpha = 0.2;
-    fill(0, 0, 255, 100);
-    rect(0, 0, w, h);
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(frozenImg, 0, 0, w, h);
     ctx.globalAlpha = 1;
-    fill(255);
+    fill(145, 215, 215);
     textSize(dim/10);
     text("Frozen", w/2, h/3);
     textSize(dim/20);
@@ -283,7 +316,7 @@ canvas.onmouseup = function(e){
   mouse.clicked = true;
   mouse.button = e.button;
   mouse.x = e.offsetX;
-  mouse.y = e.offsetY + h - windowHeight;
+  mouse.y = e.offsetY + h - canvasHeight;
 };
 
 function fallbackCopyTextToClipboard(text) {
@@ -300,11 +333,9 @@ function fallbackCopyTextToClipboard(text) {
   textArea.select();
 
   try {
-    var successful = document.execCommand('copy');
-    var msg = successful ? 'successful' : 'unsuccessful';
-    console.log('Fallback: Copying text command was ' + msg);
+    return document.execCommand('copy');
   } catch (err) {
-    console.error('Fallback: Oops, unable to copy', err);
+    console.error('Fallback: Unable to copy. Please report to 1egend#8314 (discord)', err);
   }
 
   document.body.removeChild(textArea);
@@ -312,19 +343,19 @@ function fallbackCopyTextToClipboard(text) {
 
 function copyTextToClipboard(text) {
   if (!navigator.clipboard) {
-    fallbackCopyTextToClipboard(text);
-    return;
+    return fallbackCopyTextToClipboard(text);
   }
   navigator.clipboard.writeText(text).then(function() {
-    console.log('Async: Copying to clipboard was successful!');
   }, function(err) {
-    console.error('Async: Could not copy text: ', err);
+    console.error('Unable to copy text. Please report to 1egend#8314 (discord)', err);
   });
 }
 
-canvas.onclick = function(){
+canvas.onclick = function(e){
   if (state == 1 && createdRoom){
+    e.preventDefault;
     copyTextToClipboard(createdRoom);
+    runSnackbar("Copied to clipboard!");
   }
 };
 
@@ -343,11 +374,11 @@ function updateClient(){
         fill(0);
         textSize(20);
         if (createdRoom){
-          text('Created a room!', windowWidth/2, windowHeight/2);
-          text('Room code to join (click to copy): ' + createdRoom, windowWidth/2, windowHeight * 2/3);
+          text('Created a room!', canvasWidth/2, canvasHeight/2);
+          text('Room code to join (click to copy): ' + createdRoom, canvasWidth/2, canvasHeight * 2/3);
         }
         else{
-          text('Waiting for second player...', windowWidth/2, windowHeight/2);
+          text('Waiting for second player...', canvasWidth/2, canvasHeight/2);
         }
       break;
       case 2:
@@ -363,9 +394,10 @@ function matchMake(){
   if (state != 0){
     return;
   }
-  var roomCode = document.getElementById("roomInput").value;
+  let roomCode = document.getElementById("roomInput").value;
   socket.emit('matchmake', {room: roomCode, w: w, h: h});
-  document.getElementById("menu").style.display = "none";
+  toggleMenu(false);
+  runSnackbar("Entered matchmaking");
   state = 1;
 }
 
@@ -375,10 +407,9 @@ function makeRoom(){
   }
   socket.emit('makeRoom', {w: w, h: h});
   createdRoom = socket.id;
-  console.log(createdRoom);
-  document.getElementById("menu").style.display = "none";
+  toggleMenu(false);
   state = 1;
 }
 
 //matchMake();
-window.addEventListener("load", updateClient, false);
+window.addEventListener("load", updateClient, false);         
