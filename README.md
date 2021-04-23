@@ -1,4 +1,5 @@
-# Minesweeper
+# Minesweeper Battles
+![Logo](./assets/logo.png)
 ### Welcome to Minesweeper Battles!
 A classic game of minesweeper but with 2 players facing off.
 
