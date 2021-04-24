@@ -6,13 +6,14 @@
 
     <!-- OG Meta Tags for Social Media Queries --> 
     <meta property="og:title" content="Minesweeper Battles"/> 
-    <!-- Thumbnail here <meta property="og:image" content="https://raw.githubusercontent.com/1e9end/minesweeper"/> -->
+    <meta property="og:image" content="./assets/icon.png"/>
     <meta property="og:description" content="Online multiplayer Minesweeper battles!" /> 
     <meta property="og:url" content= "https://minesweeper.1egend.repl.co"/> 
     <meta property="og:type" content="website"/>
 
     <title>Minesweeper</title>
 
+    <link rel="icon" type="image/png" href="./assets/favicon.png"/>
     <!-- Google fonts, jQuery, Socket.io -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet"> 
@@ -61,7 +62,17 @@
           left: 50%;
           transform: translate(-50%, -50%);
           text-align: center;
-          font-size: 2em;
+        }
+
+        #menu button{
+          background-color: #4CAF50;
+          margin-top: 5px;
+          border: none;
+          color: white;
+          padding: 10px 25px;
+          text-align: center;
+          display: inline-block;
+          font-size: 16px;
         }
 
         #logo {
@@ -115,6 +126,7 @@
           left: 50%; 
           bottom: 30px; 
         }
+
         /* Show snackbar */
         #snackbar.show {
           visibility: visible;
@@ -143,7 +155,31 @@
         } 
 
         // Mobile CSS scaling
-        @media only screen and (max-height: 800px) and (max-width: 800px){
+        @media only screen and (max-width: 800px){
+        @media only screen {
+          body{
+
+          }
+          #description {
+            text-align: center;
+            right: initial;
+            bottom: 10px;
+            padding: 10px;
+            width: calc(100vw - 20px);
+            height: 20vh;
+
+            top: initial; 
+            -ms-transform: initial;
+            -webkit-transform: initial;
+            transform: initial;
+          }
+          #footer{
+            position: absolute;
+            bottom: initial;
+            top: 0px;
+            padding: 5px;
+            text-align: center;
+          }
         }
     </style>
 </head>
