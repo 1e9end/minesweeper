@@ -6,7 +6,7 @@
 
     <!-- OG Meta Tags for Social Media Queries --> 
     <meta property="og:title" content="Minesweeper Battles"/> 
-    <meta property="og:image" content="./assets/icon.png"/>
+    <meta property="og:image" content="https://raw.githubusercontent.com/1e9end/minesweeper-battles/master/assets/favicon.png"/>
     <meta property="og:description" content="Online multiplayer Minesweeper battles!" /> 
     <meta property="og:url" content= "https://minesweeper.1egend.repl.co"/> 
     <meta property="og:type" content="website"/>
@@ -33,11 +33,11 @@
 
         #bg{
           position: absolute;
-          width: 200vw;
-          height: 200vh;
+          width: 200vmax;
+          height: 200vmax;
           background-image: url("./assets/background.png");
           background-repeat: repeat;
-          transform: translate(-25%, -25%) rotate(-30deg);
+          transform: translate(calc(50vw - 100vmax), calc(50vh - 100vmax)) rotate(-30deg);
         }
 
         .v-center{
@@ -66,6 +66,17 @@
 
         #menu button{
           background-color: #4CAF50;
+          margin-top: 5px;
+          border: none;
+          color: white;
+          padding: 10px 25px;
+          text-align: center;
+          display: inline-block;
+          font-size: 16px;
+        }
+
+        #menu button:hover{
+          background-color: #4C9F50;
           margin-top: 5px;
           border: none;
           color: white;
@@ -154,12 +165,7 @@
           to {bottom: 0; opacity: 0;}
         } 
 
-        // Mobile CSS scaling
-        @media only screen and (max-width: 800px){
-        @media only screen {
-          body{
-
-          }
+        @media only screen and (max-width: 1000px) {
           #description {
             text-align: center;
             right: initial;

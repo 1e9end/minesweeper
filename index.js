@@ -332,11 +332,18 @@ Game.prototype = {
     // Emit endgame to all the clients
     io.to(this.roomInfo.room).emit('endGame');
 
-    // Remove all members of the room from the room (flexible for potential future 3+ player support)
+    /** Remove all members of the room from the room (flexible for potential future 3+ player support)
     var clients = io.sockets.adapter.rooms.get(this.roomInfo.room);
     for (var socketId of clients) {
       var clientSocket = io.sockets.sockets.get(socketId);
       clientSocket.leave(this.roomInfo.room);
+    }
+    **/
+    if (io.sockets.sockets.get(this.roomInfo.p1) != undefined){
+      io.sockets.sockets.get(this.roomInfo.p1).leave(this.roomInfo.room);
+    }
+    if (io.sockets.sockets.get(this.roomInfo.p2) != undefined){
+      io.sockets.sockets.get(this.roomInfo.p2).leave(this.roomInfo.room);
     }
 
     // Delete key/value pairs from rooms{} and games{}
